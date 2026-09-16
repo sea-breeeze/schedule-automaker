@@ -17,4 +17,12 @@ if st.button("Submit"):
     else:
         st.success(f"Thank you, {worker_name}. Your availability has been recorded: {', '.join(availability)}.")
 
-    
+worker = {
+    "name": worker_name,
+    "availability": availability
+}
+
+st.session_state.workers.append(worker)
+
+if "workers" not in st.session_state:
+    st.session_state.workers = []
