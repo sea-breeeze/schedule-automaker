@@ -56,4 +56,28 @@ st.write(task_name, task_duration)
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
 
-st.session_state.tasks.append(task);
+if st.button("Add Task"):
+    if not task_name:
+        st.error("Please enter a task name.")
+    else:
+        duplicate_found = False
+
+        for task in st.session_state.tasks:
+            if task["name"] == task_name:
+                duplicate_found = True
+                break
+
+        if duplicate_found:
+            st.error(f"Duplicate task found for {task_name}. Please enter a unique task name.")
+            
+        else:
+            task = {
+                "name": task_name,
+                "duration": task_duration
+            }
+            st.session_state.tasks.append(task)
+            st.success(f"Task '{task_name}' with duration {task_duration} minutes has been added.")
+
+
+for task in st.session_state.tasks:
+    st.write(f"Task: {task['name']}, Duration: {task['duration']} minutes")
