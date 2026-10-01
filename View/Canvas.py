@@ -101,3 +101,28 @@ sorted_tasks = sorted(st.session_state.tasks, key=get_task_duration, reverse=Tru
 
 for task in sorted_tasks:
     st.write(f"Task: {task['name']}, Duration: {task['duration']} minutes")
+
+worker_minutes = {}
+
+for worker in available_workers:
+    worker_minutes[worker["name"]] = 0
+
+def get_worker_minutes(worker):
+    return worker_minutes[worker["name"]]
+
+
+assignments = []
+
+for task in sorted_tasks:
+    lowest_worker = min(available_workers, key=get_worker_minutes)
+
+    assignment = {
+        "worker": lowest_worker["name"],
+        "task": task["name"],
+        "duration": task["duration"]
+    }
+    assignments.append(assignment)
+    worker_minutes[lowest_worker["name"]] += task["duration"]
+
+for assignment in assignments:
+    st.write(f"Worker: {assignment['worker']}, Task: {assignment['task']}, Duration: {assignment['duration']} minutes")
