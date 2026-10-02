@@ -83,46 +83,82 @@ if st.button("Add Task"):
 for task in st.session_state.tasks:
     st.write(f"Task: {task['name']}, Duration: {task['duration']} minutes")
 
-day = "Mon"
+days = [ "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-available_workers = []
-
-for worker in st.session_state.workers:
-    if day in worker["availability"]:
-        available_workers.append(worker)
-
-for worker in available_workers:
-    st.write(f"Available Worker: {worker['name']}")
-
+# Function to get the duration of a task
 def get_task_duration(task):
     return task["duration"]
 
-sorted_tasks = sorted(st.session_state.tasks, key=get_task_duration, reverse=True)
 
-for task in sorted_tasks:
-    st.write(f"Task: {task['name']}, Duration: {task['duration']} minutes")
+# Sort tasks from longest duration to shortest
+sorted_tasks = sorted(
+    st.session_state.tasks,
+    key=get_task_duration,
+    reverse=True
+)
 
-worker_minutes = {}
 
-for worker in available_workers:
-    worker_minutes[worker["name"]] = 0
-
+# Function to get the current assigned minutes for a worker
 def get_worker_minutes(worker):
     return worker_minutes[worker["name"]]
 
 
-assignments = []
+# Days of the week
+days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-for task in sorted_tasks:
-    lowest_worker = min(available_workers, key=get_worker_minutes)
 
-    assignment = {
-        "worker": lowest_worker["name"],
-        "task": task["name"],
-        "duration": task["duration"]
-    }
-    assignments.append(assignment)
-    worker_minutes[lowest_worker["name"]] += task["duration"]
+# Go through each day
+for day in days:
 
-for assignment in assignments:
-    st.write(f"Worker: {assignment['worker']}, Task: {assignment['task']}, Duration: {assignment['duration']} minutes")
+    # Find workers available on this day
+    available_workers = []
+
+    for worker in st.session_state.workers:
+        if day in worker["availability"]:
+            available_workers.append(worker)
+
+    # Check if nobody is available
+    if not available_workers:
+        st.write(f"No workers available on {day}.")
+
+    else:
+        # Start each available worker at 0 assigned minutes
+        worker_minutes = {}
+
+        for worker in available_workers:
+            worker_minutes[worker["name"]] = 0
+
+        # Store this day's assignments
+        assignments = []
+
+        # Go through tasks from longest to shortest
+        for task in sorted_tasks:
+
+            # Find the worker with the lowest current workload
+            lowest_worker = min(
+                available_workers,
+                key=get_worker_minutes
+            )
+
+            # Create the assignment
+            assignment = {
+                "worker": lowest_worker["name"],
+                "task": task["name"],
+                "duration": task["duration"]
+            }
+
+            # Save the assignment
+            assignments.append(assignment)
+
+            # Update the worker's total assigned minutes
+            worker_minutes[lowest_worker["name"]] += task["duration"]
+
+        # Display the completed schedule for this day
+        st.write(f"{day} Schedule")
+
+        for assignment in assignments:
+            st.write(
+                f"Worker: {assignment['worker']}, "
+                f"Task: {assignment['task']}, "
+                f"Duration: {assignment['duration']} minutes"
+            )
