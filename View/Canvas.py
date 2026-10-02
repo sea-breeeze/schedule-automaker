@@ -102,33 +102,25 @@ sorted_tasks = sorted(
 def get_worker_minutes(worker):
     return worker_minutes[worker["name"]]
 
-
-# Days of the week
-days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-
-# Go through each day
-for day in days:
-
-    # Find workers available on this day
+def get_available_workers_for_day(workers, day):
     available_workers = []
 
-    for worker in st.session_state.workers:
+    for worker in workers:
         if day in worker["availability"]:
             available_workers.append(worker)
 
-    # Check if nobody is available
-    if not available_workers:
-        st.write(f"No workers available on {day}.")
+    return available_workers
 
-    else:
-        # Start each available worker at 0 assigned minutes
-        worker_minutes = {}
+def initialize_worker_minutes(available_workers):
+    worker_minutes = {}
 
-        for worker in available_workers:
-            worker_minutes[worker["name"]] = 0
+    for worker in available_workers:
+        worker_minutes[worker["name"]] = 0
 
-        # Store this day's assignments
+    return worker_minutes
+
+
+def assign_tasks(sorted_tasks, available_workers, worker_minutes):
         assignments = []
 
         # Go through tasks from longest to shortest
@@ -137,7 +129,7 @@ for day in days:
             # Find the worker with the lowest current workload
             lowest_worker = min(
                 available_workers,
-                key=get_worker_minutes
+                key=lambda worker: worker_minutes[worker["name"]]
             )
 
             # Create the assignment
@@ -153,6 +145,27 @@ for day in days:
             # Update the worker's total assigned minutes
             worker_minutes[lowest_worker["name"]] += task["duration"]
 
+            return assignments
+
+# Days of the week
+days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+# Go through each day
+for day in days:
+
+    # Find workers available on this day
+    available_workers = get_available_workers_for_day(st.session_state.workers, day)
+
+    # Check if nobody is available
+    if not available_workers:
+        st.write(f"No workers available on {day}.")
+
+    else:
+        worker_minutes = initialize_worker_minutes(available_workers)
+
+        assignments = assign_tasks(sorted_tasks, available_workers, worker_minutes)
+
         # Display the completed schedule for this day
         st.write(f"{day} Schedule")
 
@@ -162,3 +175,4 @@ for day in days:
                 f"Task: {assignment['task']}, "
                 f"Duration: {assignment['duration']} minutes"
             )
+
