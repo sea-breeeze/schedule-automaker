@@ -121,58 +121,71 @@ def initialize_worker_minutes(available_workers):
 
 
 def assign_tasks(sorted_tasks, available_workers, worker_minutes):
-        assignments = []
+    assignments = []
 
-        # Go through tasks from longest to shortest
-        for task in sorted_tasks:
+    for task in sorted_tasks:
+        lowest_worker = min(
+            available_workers,
+            key=lambda worker: worker_minutes[worker["name"]]
+        )
 
-            # Find the worker with the lowest current workload
-            lowest_worker = min(
+        assignment = {
+            "worker": lowest_worker["name"],
+            "task": task["name"],
+            "duration": task["duration"]
+        }
+
+        assignments.append(assignment)
+        worker_minutes[lowest_worker["name"]] += task["duration"]
+
+    return assignments
+
+def generate_weekly_schedule(workers, sorted_tasks, days):
+ 
+    weekly_schedule = {}
+
+    for day in days:
+        available_workers = get_available_workers_for_day(
+            workers,
+            day
+        )
+
+        if not available_workers:
+            weekly_schedule[day] = []
+
+        else:
+            worker_minutes = initialize_worker_minutes(available_workers)
+
+            assignments = assign_tasks(
+                sorted_tasks,
                 available_workers,
-                key=lambda worker: worker_minutes[worker["name"]]
+                worker_minutes
             )
 
-            # Create the assignment
-            assignment = {
-                "worker": lowest_worker["name"],
-                "task": task["name"],
-                "duration": task["duration"]
-            }
+            weekly_schedule[day] = assignments
 
-            # Save the assignment
-            assignments.append(assignment)
-
-            # Update the worker's total assigned minutes
-            worker_minutes[lowest_worker["name"]] += task["duration"]
-
-            return assignments
+    return weekly_schedule
 
 # Days of the week
 days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
+weekly_schedule = generate_weekly_schedule(
+    st.session_state.workers,
+    sorted_tasks,
+    days
+)
 
-# Go through each day
-for day in days:
+def display_schedule(weekly_schedule):
+    for day, assignments in weekly_schedule.items():
+        st.subheader(f"Schedule for {day}:")
+        if not assignments:
+            st.write("No tasks assigned.")
+        else:
+            for assignment in assignments:
+                st.write(f"Worker: {assignment['worker']}, Task: {assignment['task']}, Duration: {assignment['duration']} minutes") 
 
-    # Find workers available on this day
-    available_workers = get_available_workers_for_day(st.session_state.workers, day)
+display_schedule(weekly_schedule)
 
-    # Check if nobody is available
-    if not available_workers:
-        st.write(f"No workers available on {day}.")
+worker_names = [worker["name"] for worker in st.session_state.workers]
 
-    else:
-        worker_minutes = initialize_worker_minutes(available_workers)
-
-        assignments = assign_tasks(sorted_tasks, available_workers, worker_minutes)
-
-        # Display the completed schedule for this day
-        st.write(f"{day} Schedule")
-
-        for assignment in assignments:
-            st.write(
-                f"Worker: {assignment['worker']}, "
-                f"Task: {assignment['task']}, "
-                f"Duration: {assignment['duration']} minutes"
-            )
-
+selected_worker = st.selectbox("Select a worker:", worker_names)
