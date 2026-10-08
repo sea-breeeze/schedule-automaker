@@ -1,0 +1,47 @@
+{
+    "workers": [
+        {
+            "name": "juan",
+            "availability": [
+                "Tue",
+                "Thu"
+            ]
+        },
+        {
+            "name": "john",
+            "availability": [
+                "Tue",
+                "Thu",
+                "Wed",
+                "Mon"
+            ]
+        },
+        {
+            "name": "larry",
+            "availability": [
+                "Thu",
+                "Mon",
+                "Fri",
+                "Sat",
+                "Sun"
+            ]
+        }
+    ],
+    "tasks": [
+        {
+            "name": "sauce",
+            "duration": 12,
+            "rotating": true
+        },
+        {
+            "name": "food",
+            "duration": 18,
+            "rotating": true
+        },
+        {
+            "name": "clean",
+            "duration": 6,
+            "rotating": true
+        }
+    ]
+}

@@ -1,17 +1,20 @@
 import streamlit as st
 import csv
 import io
+import json
+from database import *
 
-# --------------------------------------------------
-# CONSTANTS
-# --------------------------------------------------
+# Load workers and tasks from SQLite when the session starts
+if "database_loaded" not in st.session_state:
+    st.session_state.workers = get_workers()
+    st.session_state.tasks = get_tasks()
+    st.session_state.weekly_schedule = {}
+
+    st.session_state.database_loaded = True
+    
 
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-
-# --------------------------------------------------
-# SESSION STATE
-# --------------------------------------------------
 
 if "workers" not in st.session_state:
     st.session_state.workers = []
@@ -19,10 +22,11 @@ if "workers" not in st.session_state:
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
 
+if "weekly_schedule" not in st.session_state:
+    st.session_state.weekly_schedule = {}
 
-# --------------------------------------------------
-# SCHEDULING FUNCTIONS
-# --------------------------------------------------
+# call the function to create the database and tables
+create_database()
 
 def get_task_duration(task):
     return task["duration"]
@@ -46,9 +50,35 @@ def initialize_worker_minutes(available_workers):
 
     return worker_minutes
 
+def save_data():
+    data = {
+        "workers": st.session_state.workers,
+        "tasks": st.session_state.tasks,
+    }
+
+    with open("schedule_data.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+def load_data():
+    try: 
+        with open("schedule_data.json", "r") as file:
+            data = json.load(file)
+        st.session_state.workers = data.get("workers", [])
+        st.session_state.tasks = data.get("tasks", [])
+
+            #clear the weekly schedule when loading data
+        st.session_state.weekly_schedule = {}
+
+        return True
+    except FileNotFoundError:
+        st.error("No saved data found. Please add workers and tasks first.")
+        return False
+    except json.JSONDecodeError:
+        st.error("Error reading saved data. Please ensure the file is not corrupted.")
+        return False
 
 def assign_tasks(
-    sorted_tasks,
+          sorted_tasks,
     available_workers,
     worker_minutes,
     last_task_worker
@@ -174,9 +204,6 @@ def schedule_to_csv(weekly_schedule):
 
     return output.getvalue()
 
-# --------------------------------------------------
-# PAGE TITLE
-# --------------------------------------------------
 
 st.title("Schedule Automator")
 
@@ -185,27 +212,24 @@ st.write(
     "a balanced weekly schedule."
 )
 
+if st.button("Save Data"):
+    save_data()
+    st.success("Workers and tasks saved successfully!")
 
-# --------------------------------------------------
-# TABS
-# --------------------------------------------------
+if st.button("Load Data"):
+    if load_data():
+        st.success("Workers and tasks loaded successfully!")
+        st.rerun()
 
 worker_tab, task_tab, schedule_tab = st.tabs(
     ["Workers", "Tasks", "Schedule"]
 )
 
 
-# ==================================================
-# WORKERS TAB
-# ==================================================
 
 with worker_tab:
 
     st.header("Workers")
-
-    # -----------------------------
-    # ADD WORKER
-    # -----------------------------
 
     st.subheader("Add Worker")
 
@@ -254,10 +278,6 @@ with worker_tab:
                 )
 
 
-    # -----------------------------
-    # CURRENT WORKERS
-    # -----------------------------
-
     st.divider()
 
     st.subheader("Current Workers")
@@ -273,10 +293,6 @@ with worker_tab:
     else:
         st.info("No workers have been added yet.")
 
-
-    # -----------------------------
-    # EDIT / DELETE WORKER
-    # -----------------------------
 
     if st.session_state.workers:
 
@@ -340,17 +356,9 @@ with worker_tab:
                 st.rerun()
 
 
-# ==================================================
-# TASKS TAB
-# ==================================================
-
 with task_tab:
 
     st.header("Tasks")
-
-    # -----------------------------
-    # ADD TASK
-    # -----------------------------
 
     st.subheader("Add Task")
 
@@ -402,10 +410,6 @@ with task_tab:
                 )
 
 
-    # -----------------------------
-    # CURRENT TASKS
-    # -----------------------------
-
     st.divider()
 
     st.subheader("Current Tasks")
@@ -429,10 +433,6 @@ with task_tab:
     else:
         st.info("No tasks have been added yet.")
 
-
-    # -----------------------------
-    # EDIT / DELETE TASK
-    # -----------------------------
 
     if st.session_state.tasks:
 
@@ -503,10 +503,6 @@ with task_tab:
                 st.rerun()
 
 
-# ==================================================
-# SCHEDULE TAB
-# ==================================================
-
 with schedule_tab:
 
     st.header("Weekly Schedule")
@@ -532,21 +528,27 @@ with schedule_tab:
             reverse=True
         )
 
-        # Generate the weekly schedule
-        weekly_schedule = generate_weekly_schedule(
-            st.session_state.workers,
-            sorted_tasks,
-            DAYS
-        )
+        if st.button("Generate Schedule"):
 
-        # Display it
-        display_schedule(weekly_schedule)
+            st.session_state.weekly_schedule = generate_weekly_schedule(
+                st.session_state.workers,
+                sorted_tasks,
+                DAYS
+            )
 
-        csv_data = schedule_to_csv(weekly_schedule)
+        if st.session_state.weekly_schedule:
 
-        st.download_button(
-            label="Download Schedule as CSV",
-            data=csv_data,
-            file_name="weekly_schedule.csv",
-            mime="text/csv"
-        )
+            display_schedule(
+                st.session_state.weekly_schedule
+            )
+
+            csv_data = schedule_to_csv(
+                st.session_state.weekly_schedule
+            )
+
+            st.download_button(
+                label="Download Schedule as CSV",
+                data=csv_data,
+                file_name="weekly_schedule.csv",
+                mime="text/csv"
+            )
