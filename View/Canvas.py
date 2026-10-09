@@ -2,7 +2,11 @@ import streamlit as st
 import csv
 import io
 import json
+import sqlite3
 from database import *
+
+# call the function to create the database and tables
+create_database()
 
 # Load workers and tasks from SQLite when the session starts
 if "database_loaded" not in st.session_state:
@@ -25,8 +29,8 @@ if "tasks" not in st.session_state:
 if "weekly_schedule" not in st.session_state:
     st.session_state.weekly_schedule = {}
 
-# call the function to create the database and tables
-create_database()
+
+
 
 def get_task_duration(task):
     return task["duration"]
@@ -212,15 +216,6 @@ st.write(
     "a balanced weekly schedule."
 )
 
-if st.button("Save Data"):
-    save_data()
-    st.success("Workers and tasks saved successfully!")
-
-if st.button("Load Data"):
-    if load_data():
-        st.success("Workers and tasks loaded successfully!")
-        st.rerun()
-
 worker_tab, task_tab, schedule_tab = st.tabs(
     ["Workers", "Tasks", "Schedule"]
 )
@@ -266,17 +261,24 @@ with worker_tab:
                 )
 
             else:
-                worker = {
-                    "name": worker_name,
-                    "availability": availability
-                }
+                try:
+                    # Save the worker to SQLite
+                    add_worker(worker_name, availability)
 
-                st.session_state.workers.append(worker)
+                    # Refresh session state from the database
+                    st.session_state.workers = get_workers()
 
-                st.success(
-                    f"Worker '{worker_name}' has been added."
-                )
+                    # Clear the previously generated schedule
+                    st.session_state.weekly_schedule = {}
 
+                    st.success(
+                        f"Worker '{worker_name}' has been saved to the database."
+                    )
+
+                except sqlite3.IntegrityError:
+                    st.error(
+                        f"Worker '{worker_name}' already exists in the database."
+                    )
 
     st.divider()
 
@@ -325,35 +327,50 @@ with worker_tab:
                 key="updated_worker_availability"
             )
 
-            if st.button(
-                "Update Worker",
-                key="update_worker_button"
-            ):
+            if st.button("Update Worker", key="update_worker_button"):
 
                 if not updated_availability:
-                    st.error(
-                        "Please select at least one available day."
-                    )
+                    st.error("Please select at least one available day.")
 
                 else:
-                    selected_worker_data["availability"] = (
-                        updated_availability
-                    )
+                    try:
+                        # Update availability in SQLite
+                        updated = update_worker(
+                            selected_worker,
+                            updated_availability
+                        )
 
-                    st.success(
-                        f"Worker '{selected_worker}' has been updated."
-                    )
+                        if updated == 1:
+                            # Reload workers from SQLite
+                            st.session_state.workers = get_workers()
 
-            if st.button(
-                "Delete Worker",
-                key="delete_worker_button"
-            ):
+                            # Clear outdated schedule
+                            st.session_state.weekly_schedule = {}
 
-                st.session_state.workers.remove(
-                    selected_worker_data
-                )
+                            st.success(
+                                f"Worker '{selected_worker}' has been updated."
+                            )
+                        else:
+                            st.error("Worker was not found in the database.")
 
-                st.rerun()
+                    except sqlite3.Error as error:
+                        st.error(f"Database error: {error}")
+
+            if st.button("Delete Worker", key="delete_worker_button"):
+
+                try:
+                    deleted = delete_worker(selected_worker)
+
+                    if deleted == 1:
+                        st.session_state.workers = get_workers()
+                        st.session_state.weekly_schedule = {}
+
+                        st.rerun()
+                    else:
+                        st.error("Worker was not found in the database.")
+
+                except sqlite3.Error as error:
+                    st.error(f"Database error: {error}")
 
 
 with task_tab:
@@ -397,17 +414,24 @@ with task_tab:
                 )
 
             else:
-                task = {
-                    "name": task_name,
-                    "duration": task_duration,
-                    "rotating": rotating
-                }
+                try:
+                    # Save task to SQLite
+                    add_task(task_name, task_duration, rotating)
 
-                st.session_state.tasks.append(task)
+                    # Reload tasks from SQLite
+                    st.session_state.tasks = get_tasks()
 
-                st.success(
-                    f"Task '{task_name}' has been added."
-                )
+                    # Clear outdated schedule
+                    st.session_state.weekly_schedule = {}
+
+                    st.success(
+                        f"Task '{task_name}' has been saved to the database."
+                    )
+
+                except sqlite3.IntegrityError:
+                    st.error(
+                        f"Task '{task_name}' already exists in the database."
+                    )
 
 
     st.divider()
@@ -474,33 +498,51 @@ with task_tab:
                 key="updated_task_rotating"
             )
 
-            if st.button(
-                "Update Task",
-                key="update_task_button"
-            ):
+            if st.button("Update Task", key="update_task_button"):
 
-                selected_task_data["duration"] = (
-                    updated_duration
-                )
+                try:
+                    updated = update_task(
+                        selected_task,
+                        updated_duration,
+                        updated_rotating
+                    )
 
-                selected_task_data["rotating"] = (
-                    updated_rotating
-                )
+                    if updated == 1:
+                        # Reload tasks from SQLite
+                        st.session_state.tasks = get_tasks()
 
-                st.success(
-                    f"Task '{selected_task}' has been updated."
-                )
+                        # Clear outdated schedule
+                        st.session_state.weekly_schedule = {}
 
-            if st.button(
-                "Delete Task",
-                key="delete_task_button"
-            ):
+                        st.success(
+                            f"Task '{selected_task}' has been updated."
+                        )
 
-                st.session_state.tasks.remove(
-                    selected_task_data
-                )
+                    else:
+                        st.error("Task was not found in the database.")
 
-                st.rerun()
+                except sqlite3.Error as error:
+                    st.error(f"Database error: {error}")
+
+            if st.button("Delete Task", key="delete_task_button"):
+
+                try:
+                    deleted = delete_task(selected_task)
+
+                    if deleted == 1:
+                        # Reload tasks from SQLite
+                        st.session_state.tasks = get_tasks()
+
+                        # Clear outdated schedule
+                        st.session_state.weekly_schedule = {}
+
+                        st.rerun()
+
+                    else:
+                        st.error("Task was not found in the database.")
+
+                except sqlite3.Error as error:
+                    st.error(f"Database error: {error}")
 
 
 with schedule_tab:
